@@ -1,0 +1,26 @@
+---
+- name: Common system settings
+  hosts: all
+  roles:
+    - docker
+- name: Setup mysql on db node
+  hosts: mysql
+  roles:
+    - role: mysql
+  tasks:
+  - name: Install docker-py
+    package:
+      name: python-docker
+
+  - name: start wordpress
+    docker_container:
+      name: wordpress
+      image: "wordpress:php7.1"
+      tty: true
+      restart_policy: unless-stopped
+      env:
+        WORDPRESS_DB_HOST: 172.17.0.1
+        WORDPRESS_DB_USER: cust_a_wp
+        WORDPRESS_DB_PASSWORD: cust_a_wp
+        WORDPRESS_DB_NAME: cust_a_wp
+      network_mode: host

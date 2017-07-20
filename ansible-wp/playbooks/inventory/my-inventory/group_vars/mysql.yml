@@ -1,0 +1,17 @@
+---
+mysql_databases:
+  - name: cust_a_wp
+    encoding: latin1
+    collation: latin1_general_ci
+  - name: cust_b_wp
+    encoding: latin1
+    collation: latin1_general_ci
+mysql_users:
+  - name: cust_a_wp
+    host: "%"
+    password: cust_a_wp
+    priv: "cust_a_wp.*:ALL"
+  - name: cust_b_wp
+    host: "%"
+    password: cust_b_wp
+    priv: "cust_b_wp.*:ALL"
