@@ -31,11 +31,11 @@ class Customers(Base):
 
     id = Column(Integer, primary_key=True)
     name = Column(String(100), unique=True, nullable=False)
-    app = Column(String(30))
+    apps = Column(String(30))
 
-    def __init__(self, name=None, app=None):
+    def __init__(self, name=None, apps=None):
         self.name = name
-        self.app = app
+        self.apps = apps
 
     def __repr__(self):
         return '<Customers %r>' % self.name
@@ -50,22 +50,23 @@ class Customers(Base):
 
     def show(self, name=None):
         if name:
-            return self.object_as_dict(self.query.filter_by(name=name).all())
+            return self._object_as_dict(self.query.filter_by(name=name).all())
         else:
-            return self.object_as_dict(self.query.all())
+            return self._object_as_dict(self.query.all())
 
     @staticmethod
-    def object_as_dict(obj):
+    def _object_as_dict(obj):
         dict = []
         for r in obj:
-            dict.append({c.key: getattr(r, c.key)
+            dict.append({c.key: getattr(r, c.key).split(',')
+                         if c.key == 'apps' else getattr(r, c.key)
                          for c in inspect(r).mapper.column_attrs})
         return dict
 
 
 class CustomerManager(Resource):
     parser = reqparse.RequestParser()
-    parser.add_argument("app", choices=("wordpress",), required=True, help="Unknown App - {error_msg}")
+    parser.add_argument("apps", choices=("wordpress",), required=True, help="Unknown App - {error_msg}")
 
     def get(self, name=None):
         cust = Customers().show(name)
@@ -77,7 +78,7 @@ class CustomerManager(Resource):
     def post(self, name):
         data = request.json
         args = self.parser.parse_args()
-        Customers(name, args["app"]).add()
+        Customers(name, args["apps"]).add()
         return self.get(name)
 
 api.add_resource(CustomerManager, "/customers", "/customers/",
@@ -94,4 +95,6 @@ def shutdown_session(exception=None):
 
 if __name__ == "__main__":
     init_db()
-    app.run(debug=True)
+    app.run(debug=True,
+            host=os.getenv("CUSTOMER_APP_LISTEN_ADDR", "127.0.0.1"),
+            port=int(os.getenv("CUSTOMER_APP_LISTEN_PORT", "5000")))
