@@ -47,3 +47,22 @@ pages
     * Add/Remove/update cloud endpoints (may be..) 
     * Add/remove/update datacenters - virtual datacenters may be
 * Security
+
+
+### Implementation
+#### Api
+
+/customers
+    id: uuid or may be just a pk
+    name: name
+/apps
+    id: pk
+    customer: customers.id
+    type: app type (wordpress)
+    config: json app configuration
+/instances:
+    id: pk
+    app_id: apps.id
+    type: [wordpress, nginx, db, lb, cache]
+    host: 
+    

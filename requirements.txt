@@ -1,0 +1,5 @@
+flask-restful
+flask-sqlalchemy
+future
+sqlalchemy
+
