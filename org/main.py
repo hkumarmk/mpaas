@@ -11,9 +11,9 @@ import os
 
 app = Flask(__name__)
 
-DATABASE_URI = "sqlite:////tmp/mpaas_customer.db"
+DATABASE_URI = "sqlite:////tmp/mpaas_org.db"
 
-app.config["DATABASE_URI"] = os.getenv("MPAAS_CUSTOMER_DB_URL", DATABASE_URI)
+app.config["DATABASE_URI"] = os.getenv("MPAAS_ORG_DB_URL", DATABASE_URI)
 engine = create_engine(app.config["DATABASE_URI"], convert_unicode=True)
 db_session = scoped_session(sessionmaker(autocommit=False,
                                          autoflush=False,
@@ -25,10 +25,10 @@ api = Api(app)
 
 
 # Models
-class Customers(Base):
-    __tablename__ = "customers"
+class Orgs(Base):
+    __tablename__ = "orgs"
 
-    CUST_STATUS = {
+    ORG_STATUS = {
         0: {'id': 'free_tier', 'desc': 'Free Tier'},
         1: {'id': 'active', 'desc': 'Active'},
         -1: {'id': 'inactive', 'desc': 'Inactive'},
@@ -36,31 +36,22 @@ class Customers(Base):
     }
     id = Column(Integer, primary_key=True)
     name = Column(String(100), unique=True, nullable=False)
-    custid = Column(String(20), unique=True, nullable=False)
-    email = Column(String(100), nullable=False)
+    custid = Column(String(20), nullable=False)
+    spaces = Column(String(200), nullable=False)
     # status: status of customer
     # 0 - free tier, 1 - active, -1 - inactive, -2 - disabled
     status = Column(Integer, default=0)
 
-    def __init__(self, name=None, email=None, custid=None, status=None):
+    def __init__(self, name=None, custid=None, spaces=None, status=None):
         self.name = name
-        self.email = email
+        self.spaces = spaces
         self.custid = custid
         self.status = status
 
     def __repr__(self):
-        return '<Customers %r>' % self.name
-
-    def _is_custid_exists(self, custid):
-        return True if self.query.filter_by(custid=custid).count() > 0 else False
+        return '<Orgs %r>' % self.name
 
     def add(self):
-        num_letters = 3
-        upper_name = self.name.upper()
-        self.custid = upper_name[:num_letters]
-        while self._is_custid_exists(self.custid):
-            num_letters += 1
-            self.custid = upper_name[:num_letters]
         try:
             db_session.add(self)
             db_session.commit()
@@ -69,12 +60,10 @@ class Customers(Base):
         return True
 
     def show(self, name=None, custid=None, status=None):
-        fields = ['name', 'custid', 'status']
+        fields = ['name', 'custid', 'status', 'spaces']
         # TODO: we would have to implement using combinatoin of params
         if custid:
-            return self._object_as_dict(self.query.filter_by(custid=custid).with_entities(
-                self.custid, self.name, self.email, self.status
-            ))
+            return self._object_as_dict(self.query.filter_by(custid=custid).all())
         elif name:
             return self._object_as_dict(self.query.filter_by(name=name).all())
         elif status:
@@ -89,7 +78,7 @@ class Customers(Base):
                 abort(404, "Requested entity does not exist")
             db_session.commit()
         except exc.SQLAlchemyError as err:
-            abort(400, "Delete customer failed - %s" % err)
+            abort(400, "Delete org failed - %s" % err)
 
     def _fix_output(self, data):
         out = {}
@@ -97,7 +86,7 @@ class Customers(Base):
             if column.key == 'id':
                 continue
             if column.key == 'status':
-                out.update({'status': self.CUST_STATUS[getattr(data, column.key)]['desc']})
+                out.update({'status': self.ORG_STATUS[getattr(data, column.key)]['desc']})
             else:
                 out.update({column.key: getattr(data, column.key)})
 
@@ -107,30 +96,32 @@ class Customers(Base):
         return list(map(self._fix_output, obj))
 
 
-class CustomerManager(Resource):
+class OrgManager(Resource):
     parser = reqparse.RequestParser()
     #parser.add_argument("apps", choices=("wordpress",), required=True, help="Unknown App - {error_msg}")
-    parser.add_argument("email", required=True, help="Email id is required")
+    parser.add_argument("custid", required=True, help="Customer id is required")
+    parser.add_argument("spaces", help="List of Spaces within the org")
+    parser.add_argument("status", help="Status of the org")
 
     def get(self, name=None, custid=None):
-        cust = Customers().show(name=name, custid=custid)
-        if cust or not custid or not name:
-            return jsonify(Customer=cust)
+        org = Orgs().show(name=name, custid=custid)
+        if org or not custid or not name:
+            return jsonify(Org=org)
         else:
             abort(410, "Resource with that ID no longer exists")
 
     def post(self, name):
         args = self.parser.parse_args()
-        Customers(name, args["email"]).add()
+        Orgs(name, args["custid"], args["spaces"], args["status"]).add()
         return self.get(name)
 
     def delete(self, name):
-        Customers().delete(name)
+        Orgs().delete(name)
         return jsonify({'status': True})
 
 
-api.add_resource(CustomerManager, "/customers", "/customers/",
-                 "/customers/<string:name>")
+api.add_resource(OrgManager, "/orgs", "/orgs/",
+                 "/orgs/<string:name>")
 
 
 def init_db():
@@ -145,5 +136,5 @@ def shutdown_session(exception=None):
 if __name__ == "__main__":
     init_db()
     app.run(debug=True,
-            host=os.getenv("CUSTOMER_APP_LISTEN_ADDR", "127.0.0.1"),
-            port=int(os.getenv("CUSTOMER_APP_LISTEN_PORT", "5000")))
+            host=os.getenv("ORG_APP_LISTEN_ADDR", "127.0.0.1"),
+            port=int(os.getenv("ORG_APP_LISTEN_PORT", "5001")))

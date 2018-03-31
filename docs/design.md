@@ -1,4 +1,30 @@
 # High level design
+## Customers
+Each customer would be registered with an email id that would have admin access to all org created under
+that customer. This id/email may only be used to manage orgs, and users. Each org have set of users
+to manage those orgs
+## Orgs
+Each customer would have one or more orgs created. Orgs provide a completely independent place to manage
+the apps(e.g wpaas) with complete isolation fromm other orgs even within the same customer. All app instances
+are deployed under one org, so every customer will have at least one (Default) org.
+
+Customers may opt to create seperate orgs because of reasons below
+* They need completely independent app instances (wpaas instances), which may host different organization
+or team apps
+* They may need to get them indepdendently managed and get independent billing
+
+## Space
+Space is a logical separation within an org because of may be 1. to implement quota for individual team apps
+(wpaas instances), or 2. There may be different teams working on different wpaas instances, and thus would
+need to provide access control to only those systems which individual team working on.
+
+Each org must have at least one space under which the apps would be deployed and managed.
+
+## WPAAS instance
+Wpaas instance is set of systems including db, wordpress instance[s] serving single wordpress website.
+There would be multiple wordpress/db instances would be runnign withn single wpaas instance to provide
+enough redundency and failsafe. 
+ 
 
 # API Design
 ## Customer api
@@ -37,28 +63,28 @@ GET to /customers/<cid>
 This would cause all customer data deleted - it would do a DELETE call to /projects to delete all projects for the customer
 DELETE to /customers/<cid>
 
-## Projects api
-The projects api is used to manage projects within an org space (under customer). Each customer will have at least one
-project in which the resources like wpaas instances are managed. There is a default project is created on customer
-registration. Each wpaas instances will be created under a specific project. Users may have access controlled based
-on the projects.
+## org api
+The org api is used to manage projects within an org space (under customer). Each customer will have at least one
+org (and space) in which the resources like wpaas instances are managed. There is a default org is created on customer
+registration. Each wpaas instances will be created within an org. Each org is completely independent and 
+billed separately.
 
-### Create project
-POST to /projects with below data
-* Name: Name of the project
+### Create org
+POST to /orgs with below data
+* Name: Name of the org
 * Description
 * cid - customer id in which the project is created - user should have access to the customer org to successfully
 create a project
 * Any quota configs
+* spaces - list of spaces 
+## Update a org
+PUT to /orgs/<cid>/<org name> or /proects with cid and org name and other data to be updated
 
-## Update a project
-PUT to /projects/<cid>/<project name> or /proects with cid and project name and other data to be updated
+### Get org details
+GET to /orgs with cid and optionally org name
 
-### Get project details
-GET to /projects with cid and optionally proect name
-
-### Delete project
-DELETE to /projects/<cid>/<project name>
+### Delete org
+DELETE to /orgs/<cid>/<org name>
 
 ## Users api
 Each customers may have multiple users. Once a customer is registered, he may perform user management using the email id
