@@ -1,99 +1,53 @@
 # -*- mode: ruby -*-
 # vi: set ft=ruby :
-
-# All Vagrant configuration is done below. The "2" in Vagrant.configure
-# configures the configuration version (we support older styles for
-# backwards compatibility). Please don't change it unless you know what
-# you're doing.
 Vagrant.configure("2") do |config|
-  gw = ENV['gateway'] || '192.168.0.1'
-  # The most common configuration options are documented and commented below.
-  # For a complete reference, please see the online documentation at
-  # https://docs.vagrantup.com.
 
-  # Every Vagrant development environment requires a box. You can search for
-  # boxes at https://atlas.hashicorp.com/search.
-  config.vm.box = "ubuntu/xenial64"
+  default_flavor = 'small'
+  default_image = 'trusty'
 
-  # Disable automatic box update checking. If you disable this, then
-  # boxes will only be checked for updates when the user runs
-  # `vagrant box outdated`. This is not recommended.
-  # config.vm.box_check_update = false
+  # allow users to set their own environment
+  # which effect the hiera hierarchy and the
+  # cloud file that is used
+  cluster_size = ENV['cluster_size'] || 3
+  image = ENV['image']||"ubuntu/xenial64"
+  cpu = ENV['cpu'] || 1
+  ram = ENV['ram'] || 1024
+  environment = ENV['env'] || 'vagrant-vbox'
+  layout = ENV['layout'] || 'full'
+  map = ENV['map'] || environment
 
-  # Create a forwarded port mapping which allows access to a specific port
-  # within the machine from a port on the host machine. In the example below,
-  # accessing "localhost:8080" will access port 80 on the guest machine.
-  # NOTE: This will enable public access to the opened port
-  # config.vm.network "forwarded_port", guest: 80, host: 8080
-  config.vm.network "forwarded_port", guest: 80, host: 9000
-  config.vm.network "forwarded_port", guest: 5000, host: 5000
+  config.vm.provider :virtualbox do |vb, override|
+    vb.customize ["modifyvm", :id, "--natdnshostresolver1", "on"]
+    vb.customize ["modifyvm", :id, "--natdnsproxy1", "on"]
+  end
 
-  # Create a forwarded port mapping which allows access to a specific port
-  # within the machine from a port on the host machine and only allow access
-  # via 127.0.0.1 to disable public access
-  # config.vm.network "forwarded_port", guest: 80, host: 8080, host_ip: "127.0.0.1"
+  last_octet = 41
 
-  # Create a private network, which allows host-only access to the machine
-  # using a specific IP.
-  # config.vm.network "private_network", ip: "192.168.33.10"
+#  machines = {}
+#  (1..cluster_size).to_a.each do |idx|
+#    machines["node#{idx}"] = info
+#  end
 
-  # Create a public network, which generally matched to bridged network.
-  # Bridged networks make the machine appear as another physical device on
-  # your network.
-  config.vm.network "public_network", bridge: "en0: Wi-Fi (AirPort)"
+  (1..cluster_size).to_a.each do |idx|
 
-  # Share an additional folder to the guest VM. The first argument is
-  # the path on the host to the actual folder. The second argument is
-  # the path on the guest to mount the folder. And the optional third
-  # argument is a set of non-required options.
-  # config.vm.synced_folder "../data", "/vagrant_data"
-  config.vm.synced_folder "../", "/vagrant"
+    config.vm.define("node#{idx}") do |config|
 
-  # Provider-specific configuration so you can fine-tune various
-  # backing providers for Vagrant. These expose provider-specific options.
-  # Example for VirtualBox:
-  #
-  # config.vm.provider "virtualbox" do |vb|
-  #   # Display the VirtualBox GUI when booting the machine
-  #   vb.gui = true
-  #
-  #   # Customize the amount of memory on the VM:
-  #   vb.memory = "1024"
-  # end
-  #
-  # View the documentation for the provider you are using for more
-  # information on available options.
-
-  # Define a Vagrant Push strategy for pushing to Atlas. Other push strategies
-  # such as FTP and Heroku are also available. See the documentation at
-  # https://docs.vagrantup.com/v2/push/atlas.html for more information.
-  # config.push.define "atlas" do |push|
-  #   push.app = "YOUR_ATLAS_USERNAME/YOUR_APPLICATION_NAME"
-  # end
-
-  # Enable provisioning with a shell script. Additional provisioners such as
-  # Puppet, Chef, Ansible, Salt, and Docker are also available. Please see the
-  # documentation for more information about their specific syntax and use.
-  # config.vm.provision "shell", inline: <<-SHELL
-  #   apt-get update
-  #   apt-get install -y apache2
-  # SHELL
-  config.vm.provision "shell",
-    run: "always",
-    inline: "route add default gw #{gw} || true"
-
-  config.vm.provision "shell", inline: <<-SHELL
-  export DEBIAN_FRONTEND=noninteractive
-  export ANSIBLE_HOST_KEY_CHECKING=false
-  apt-get install -y --force-yes software-properties-common
-  apt-add-repository -y ppa:ansible/ansible
-  apt-get -qy update
-  apt-get install -y --force-yes ansible
-  cd /vagrant/mpaas/ansible-wp/
-  ansible-galaxy install -r requirements.yml -p playbooks/roles/
-  cd playbooks
-  ssh-keygen -t rsa -N "" -f ~/.ssh/id_rsa
-  cat ~/.ssh/id_rsa.pub >> ~/.ssh/authorized_keys
-  ansible-playbook -i inventory/my-inventory site.yml
-  SHELL
+      config.vm.provider :virtualbox do |vb, override|
+        override.vm.box = image
+        vb.memory = ram
+        vb.cpus = cpu
+      end
+      config.vm.synced_folder "../", "/vagrant"
+      config.vm.host_name = "node#{idx}.domain.name"
+     # config.vm.network :private_network, type: "dhcp"
+      config.vm.provision 'shell', :inline => <<-SHELL
+      apt-get install -y apt-transport-https curl
+      curl -s https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key add -
+      echo "deb http://apt.kubernetes.io/ kubernetes-xenial main" > /etc/apt/sources.list.d/kubernetes.list
+      apt-get update
+      # Install docker if you don't have it already.
+      apt-get install -y docker.io kubelet kubeadm kubectl kubernetes-cni
+      SHELL
+    end
+  end
 end
