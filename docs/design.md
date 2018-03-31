@@ -107,6 +107,25 @@ features:
   blah: blah
 ```
 while adding wpaas instance, there are series of operations happen.
+* Update the datastore with new wpaas instance something like /wpaas/cid/project_name which have keys as below
+    * expected_num_instances
+    * num_instances
+    * code_url
+    * features/autoscale
+    * etc etc
+* converger would converge the system to make sure the wpaas instances available that match expected numbers
+* Converger also monitor the system all the time and converge any gaps it found
+
+### Update wpaas instance
+PUT to /wpaas/cid/project_name/wpaas_name with appropriate configs that to be changed
+
+It may cause converger to converge the system to match actual state to the expected state
+
+### Get wpaas instances
+GET to /wpaas/cicd/project_name - with appropriate filters
+
+### Delete wpaas instances
+DELETE to /wpaas/cicd/project_name/wpaas_name - 
 
 
 ### QUESTIONS:
