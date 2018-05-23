@@ -4,7 +4,7 @@ from sqlalchemy import inspect
 from sqlalchemy import create_engine
 from sqlalchemy.orm import scoped_session, sessionmaker
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy import Column, Integer, String
+from sqlalchemy import Column, Integer, String, and_
 from sqlalchemy import exc
 
 import os
@@ -37,14 +37,12 @@ class Orgs(Base):
     id = Column(Integer, primary_key=True)
     name = Column(String(100), unique=True, nullable=False)
     custid = Column(String(20), nullable=False)
-    spaces = Column(String(200), nullable=False)
     # status: status of customer
     # 0 - free tier, 1 - active, -1 - inactive, -2 - disabled
     status = Column(Integer, default=0)
 
-    def __init__(self, name=None, custid=None, spaces=None, status=None):
+    def __init__(self, custid=None, name=None, status=None):
         self.name = name
-        self.spaces = spaces
         self.custid = custid
         self.status = status
 
@@ -56,24 +54,29 @@ class Orgs(Base):
             db_session.add(self)
             db_session.commit()
         except exc.IntegrityError as err:
-            abort(409, "Duplicate details - %s" % (err))
+            print(err)
+            abort(409, "Duplicate details")
         return True
 
-    def show(self, name=None, custid=None, status=None):
-        fields = ['name', 'custid', 'status', 'spaces']
+    def show(self):
+        fields = ['name', 'custid', 'status']
         # TODO: we would have to implement using combinatoin of params
-        if custid:
-            return self._object_as_dict(self.query.filter_by(custid=custid).all())
-        elif name:
-            return self._object_as_dict(self.query.filter_by(name=name).all())
-        elif status:
-            return self._object_as_dict(self.query.filter_by(status=status).all())
+        if self.name:
+            return self._object_as_dict(self.query.filter(and_(Orgs.name == self.name, Orgs.custid == self.custid)).all())
+        elif self.status:
+            return self._object_as_dict(self.query.filter(and_(Orgs.name == self.status, Orgs.custid == self.custid)).all())
         else:
-            return self._object_as_dict(self.query.all())
+            return self._object_as_dict(self.query.filter(Orgs.custid == self.custid).all())
 
-    def delete(self, name):
+    def delete(self):
         try:
-            cols_deleted = self.query.filter_by(name=name).delete()
+            if self.name:
+                cols_deleted = self.query.filter(and_(Orgs.custid == self.custid, Orgs.name == self.name)).delete()
+            elif self.status:
+                cols_deleted = self.query.filter(and_(Orgs.custid == self.custid, Orgs.status == self.status)).delete()
+            else:
+                cols_deleted = self.query.filter(Orgs.custid == self.custid).delete()
+
             if cols_deleted == 0:
                 abort(404, "Requested entity does not exist")
             db_session.commit()
@@ -99,29 +102,30 @@ class Orgs(Base):
 class OrgManager(Resource):
     parser = reqparse.RequestParser()
     #parser.add_argument("apps", choices=("wordpress",), required=True, help="Unknown App - {error_msg}")
-    parser.add_argument("custid", required=True, help="Customer id is required")
-    parser.add_argument("spaces", help="List of Spaces within the org")
     parser.add_argument("status", help="Status of the org")
 
-    def get(self, name=None, custid=None):
-        org = Orgs().show(name=name, custid=custid)
-        if org or not custid or not name:
+    def get(self, custid, name=None):
+        org = Orgs(custid, name).show()
+        if org or not name:
             return jsonify(Org=org)
         else:
             abort(410, "Resource with that ID no longer exists")
 
-    def post(self, name):
+    def post(self, custid, name):
         args = self.parser.parse_args()
-        Orgs(name, args["custid"], args["spaces"], args["status"]).add()
-        return self.get(name)
+        Orgs(custid, name, args["status"]).add()
+        return self.get(custid, name)
 
-    def delete(self, name):
-        Orgs().delete(name)
+    def delete(self, custid, name=None):
+        if name:
+            Orgs(custid, name).delete()
+        else:
+            Orgs(custid).delete()
         return jsonify({'status': True})
 
 
-api.add_resource(OrgManager, "/orgs", "/orgs/",
-                 "/orgs/<string:name>")
+api.add_resource(OrgManager, "/<int:custid>/orgs", "/<int:custid>/orgs/",
+                 "/<int:custid>/orgs/<string:name>")
 
 
 def init_db():
