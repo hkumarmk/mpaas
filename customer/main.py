@@ -5,8 +5,8 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import scoped_session, sessionmaker
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy import Column, Integer, String
-from sqlalchemy import exc
-
+from sqlalchemy import exc as sql_exc
+from exc import *
 import os
 
 app = Flask(__name__)
@@ -36,66 +36,62 @@ class Customers(Base):
     }
     id = Column(Integer, primary_key=True)
     name = Column(String(100), unique=True, nullable=False)
-    custid = Column(String(20), unique=True, nullable=False)
     email = Column(String(100), nullable=False)
     # status: status of customer
     # 0 - free tier, 1 - active, -1 - inactive, -2 - disabled
     status = Column(Integer, default=0)
 
-    def __init__(self, name=None, email=None, custid=None, status=None):
+    def __init__(self, name=None, email=None, status=None):
         self.name = name
         self.email = email
-        self.custid = custid
         self.status = status
 
     def __repr__(self):
         return '<Customers %r>' % self.name
 
-    def _is_custid_exists(self, custid):
-        return True if self.query.filter_by(custid=custid).count() > 0 else False
+    def _is_customer_exists(self, customer):
+        return True if self.query.filter_by(name=customer).count() > 0 else False
 
     def add(self):
         num_letters = 3
-        upper_name = self.name.upper()
-        self.custid = upper_name[:num_letters]
-        while self._is_custid_exists(self.custid):
-            num_letters += 1
-            self.custid = upper_name[:num_letters]
+        upper_name = "".join(list(filter(str.isalnum, self.name.upper())))
+
         try:
             db_session.add(self)
             db_session.commit()
-        except exc.IntegrityError as err:
-            abort(409, "Duplicate details - %s" % (err))
-        return True
+        except sql_exc.IntegrityError:
+            abort(409, "Duplicate details - The details you provided already exists")
+        return self.get_cust_id(self.name)
 
-    def show(self, name=None, custid=None, status=None):
-        fields = ['name', 'custid', 'status']
+    def show(self, name=None, status=None):
+        fields = ['name', 'status']
         # TODO: we would have to implement using combinatoin of params
-        if custid:
-            return self._object_as_dict(self.query.filter_by(custid=custid).with_entities(
-                self.custid, self.name, self.email, self.status
-            ))
-        elif name:
+        if name:
             return self._object_as_dict(self.query.filter_by(name=name).all())
         elif status:
             return self._object_as_dict(self.query.filter_by(status=status).all())
         else:
             return self._object_as_dict(self.query.all())
 
-    def delete(self, name):
+    def get_cust_id(self, name):
+        res = self.show(name)
+        if res:
+            return self.show(name)[0].get('id')
+        else:
+            return None
+
+    def delete(self):
         try:
-            cols_deleted = self.query.filter_by(name=name).delete()
+            cols_deleted = self.query.filter_by(name=self.name).delete()
             if cols_deleted == 0:
                 abort(404, "Requested entity does not exist")
             db_session.commit()
-        except exc.SQLAlchemyError as err:
+        except sql_exc.SQLAlchemyError as err:
             abort(400, "Delete customer failed - %s" % err)
 
     def _fix_output(self, data):
         out = {}
         for column in inspect(data).mapper.column_attrs:
-            if column.key == 'id':
-                continue
             if column.key == 'status':
                 out.update({'status': self.CUST_STATUS[getattr(data, column.key)]['desc']})
             else:
@@ -109,23 +105,41 @@ class Customers(Base):
 
 class CustomerManager(Resource):
     parser = reqparse.RequestParser()
-    #parser.add_argument("apps", choices=("wordpress",), required=True, help="Unknown App - {error_msg}")
     parser.add_argument("email", required=True, help="Email id is required")
 
-    def get(self, name=None, custid=None):
-        cust = Customers().show(name=name, custid=custid)
-        if cust or not custid or not name:
+    def get(self, name=None):
+        cust = Customers().show(name=name)
+        if cust or not name:
             return jsonify(Customer=cust)
         else:
             abort(410, "Resource with that ID no longer exists")
 
     def post(self, name):
         args = self.parser.parse_args()
-        Customers(name, args["email"]).add()
+        cust = Customers(name, args["email"])
+        if cust.get_cust_id(name):
+            abort(409, "Duplicate customer name")
+        # Revert customer addition with exception in case of any of the transactions failed.
+        try:
+
+            cust_id = cust.add()
+        except Exception as err:
+            print("Encountered error on creating customer %s" % err)
+            raise CustomerAddException
+
         return self.get(name)
 
     def delete(self, name):
-        Customers().delete(name)
+        try:
+            cust_id = Customers().get_cust_id(name)
+            # TODO: delete operation may be handled as seperate process, delete api operation may
+            # just marked that customer as "tobe_removed" status and intimate operations to start
+            # customer data removal process.
+            Customers(name).delete()
+        except Exception as err:
+            print("Encountered error on deleting customer %s" % err)
+            raise CustomerDeleteException
+
         return jsonify({'status': True})
 
 
