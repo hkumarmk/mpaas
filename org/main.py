@@ -50,8 +50,9 @@ class Orgs(Base):
     # 0 - free tier, 1 - active, -1 - inactive, -2 - disabled
     status = Column(Integer, default=0)
 
-    def __init__(self, custid=None, name=None, status=None):
+    def __init__(self, custid=None, name=None, orgid=None, status=None):
         self.name = name
+        self.orgid = orgid
         self.custid = custid
         self.status = status
 
@@ -72,6 +73,8 @@ class Orgs(Base):
         # TODO: we would have to implement using combinatoin of params
         if self.name:
             return self._object_as_dict(self.query.filter(and_(Orgs.name == self.name, Orgs.custid == self.custid)).all())
+        elif self.orgid:
+            return self._object_as_dict(self.query.filter(Orgs.id == self.orgid).all())
         elif self.status:
             return self._object_as_dict(self.query.filter(and_(Orgs.name == self.status, Orgs.custid == self.custid)).all())
         else:
@@ -113,12 +116,17 @@ class OrgManager(Resource):
     #parser.add_argument("apps", choices=("wordpress",), required=True, help="Unknown App - {error_msg}")
     parser.add_argument("status", help="Status of the org")
 
-    def get(self, custid, name=None):
-        if not is_customer_exists(custid):
-            print("Customer id {} does not exist".format(custid))
-            abort(403, "Something's not right!! You may not have access to the customer")
-        org = Orgs(custid, name).show()
-        if org or not name:
+    def get(self, custid=None, name=None, orgid=None):
+        if custid:
+            if not is_customer_exists(custid):
+                print("Customer id {} does not exist".format(custid))
+                abort(403, "Something's not right!! You may not have access to the customer")
+        else:
+            if name:
+                abort(400, "Customer id not known")
+        org = Orgs(custid, name=name, orgid=orgid).show()
+
+        if org or (not name and not orgid):
             return jsonify(Org=org)
         else:
             abort(410, "Resource with that ID no longer exists")
@@ -143,7 +151,7 @@ class OrgManager(Resource):
 
 
 api.add_resource(OrgManager, "/<int:custid>/orgs", "/<int:custid>/orgs/",
-                 "/<int:custid>/orgs/<string:name>")
+                 "/<int:custid>/orgs/<string:name>", "/orgs/<int:orgid>")
 
 
 def init_db():

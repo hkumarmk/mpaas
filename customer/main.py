@@ -122,8 +122,6 @@ class CustomerManager(Resource):
 
     def get(self, name=None, cust_id=None):
         cust = Customers().show(name=name, cust_id=cust_id)
-        if cust:
-            print("HHHHHH")
         if cust or (not name and not cust_id):
             return jsonify(Customer=cust)
         else:
