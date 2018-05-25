@@ -7,11 +7,15 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy import Column, Integer, String, and_
 from sqlalchemy import exc
 
+import requests
+
 import os
 
 app = Flask(__name__)
 
 DATABASE_URI = "sqlite:////tmp/mpaas_org.db"
+
+customer_service_url = os.getenv('CUSTOMER_SERVICE_URL', 'http://localhost:5000/customers')
 
 app.config["DATABASE_URI"] = os.getenv("MPAAS_ORG_DB_URL", DATABASE_URI)
 engine = create_engine(app.config["DATABASE_URI"], convert_unicode=True)
@@ -23,6 +27,11 @@ Base.query = db_session.query_property()
 
 api = Api(app)
 
+
+def is_customer_exists(custid):
+    resp = requests.get("{}/{}".format(customer_service_url, custid))
+    if resp.status_code == 200:
+        return True
 
 # Models
 class Orgs(Base):
@@ -105,6 +114,9 @@ class OrgManager(Resource):
     parser.add_argument("status", help="Status of the org")
 
     def get(self, custid, name=None):
+        if not is_customer_exists(custid):
+            print("Customer id {} does not exist".format(custid))
+            abort(403, "Something's not right!! You may not have access to the customer")
         org = Orgs(custid, name).show()
         if org or not name:
             return jsonify(Org=org)
@@ -112,11 +124,17 @@ class OrgManager(Resource):
             abort(410, "Resource with that ID no longer exists")
 
     def post(self, custid, name):
+        if not is_customer_exists(custid):
+            print("Customer id {} does not exist".format(custid))
+            abort(403, "Something's not right!! You may not have access to the customer")
         args = self.parser.parse_args()
         Orgs(custid, name, args["status"]).add()
         return self.get(custid, name)
 
     def delete(self, custid, name=None):
+        if not is_customer_exists(custid):
+            print("Customer id {} does not exist".format(custid))
+            abort(403, "Something's not right!! You may not have access to the customer")
         if name:
             Orgs(custid, name).delete()
         else:
