@@ -6,7 +6,6 @@ from sqlalchemy.orm import scoped_session, sessionmaker
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy import Column, Integer, String
 from sqlalchemy import exc as sql_exc
-from exc import *
 import os
 
 app = Flask(__name__)
@@ -22,6 +21,18 @@ Base = declarative_base()
 Base.query = db_session.query_property()
 
 api = Api(app)
+
+# Exceptions
+class CustomerException(BaseException):
+    pass
+
+
+class CustomerAddException(CustomerException):
+    pass
+
+
+class CustomerDeleteException(CustomerException):
+    pass
 
 
 # Models
@@ -63,11 +74,13 @@ class Customers(Base):
             abort(409, "Duplicate details - The details you provided already exists")
         return self.get_cust_id(self.name)
 
-    def show(self, name=None, status=None):
+    def show(self, name=None, cust_id=None, status=None):
         fields = ['name', 'status']
         # TODO: we would have to implement using combinatoin of params
         if name:
             return self._object_as_dict(self.query.filter_by(name=name).all())
+        elif cust_id:
+            return self._object_as_dict(self.query.filter_by(id=cust_id).all())
         elif status:
             return self._object_as_dict(self.query.filter_by(status=status).all())
         else:
@@ -107,9 +120,11 @@ class CustomerManager(Resource):
     parser = reqparse.RequestParser()
     parser.add_argument("email", required=True, help="Email id is required")
 
-    def get(self, name=None):
-        cust = Customers().show(name=name)
-        if cust or not name:
+    def get(self, name=None, cust_id=None):
+        cust = Customers().show(name=name, cust_id=cust_id)
+        if cust:
+            print("HHHHHH")
+        if cust or (not name and not cust_id):
             return jsonify(Customer=cust)
         else:
             abort(410, "Resource with that ID no longer exists")
@@ -125,7 +140,7 @@ class CustomerManager(Resource):
             cust_id = cust.add()
         except Exception as err:
             print("Encountered error on creating customer %s" % err)
-            raise CustomerAddException
+            abort(500, "Unknown error, please report")
 
         return self.get(name)
 
@@ -144,7 +159,7 @@ class CustomerManager(Resource):
 
 
 api.add_resource(CustomerManager, "/customers", "/customers/",
-                 "/customers/<string:name>")
+                 "/customers/<string:name>", "/customers/<int:cust_id>")
 
 
 def init_db():
