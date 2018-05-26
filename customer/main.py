@@ -116,10 +116,7 @@ class Customers(Base):
         return list(map(self._fix_output, obj))
 
 
-class CustomerManager(Resource):
-    parser = reqparse.RequestParser()
-    parser.add_argument("email", required=True, help="Email id is required")
-
+class CustomerBase(Resource):
     def get(self, name=None, cust_id=None):
         cust = Customers().show(name=name, cust_id=cust_id)
         if cust or (not name and not cust_id):
@@ -127,7 +124,14 @@ class CustomerManager(Resource):
         else:
             abort(410, "Resource with that ID no longer exists")
 
+
+class CustomerManager(CustomerBase):
+    parser = reqparse.RequestParser()
+    parser.add_argument("email", required=True, help="Email id is required")
+
     def post(self, name):
+        if name.replace('.','',1).isdigit():
+            abort(400, "Name should be a string")
         args = self.parser.parse_args()
         cust = Customers(name, args["email"])
         if cust.get_cust_id(name):
@@ -143,6 +147,9 @@ class CustomerManager(Resource):
         return self.get(name)
 
     def delete(self, name):
+        if name.isdigit():
+            # Cannot delete with customer id
+            abort(405)
         try:
             cust_id = Customers().get_cust_id(name)
             # TODO: delete operation may be handled as seperate process, delete api operation may
@@ -151,13 +158,14 @@ class CustomerManager(Resource):
             Customers(name).delete()
         except Exception as err:
             print("Encountered error on deleting customer %s" % err)
-            raise CustomerDeleteException
+            abort(500, "Server error during deleting customer please report it")
 
         return jsonify({'status': True})
 
 
-api.add_resource(CustomerManager, "/customers", "/customers/",
-                 "/customers/<string:name>", "/customers/<int:cust_id>")
+api.add_resource(CustomerBase, "/customers", "/customers/", "/customers/<int:cust_id>")
+
+api.add_resource(CustomerManager, "/customers/<string:name>")
 
 
 def init_db():
