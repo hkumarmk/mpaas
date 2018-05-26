@@ -4,7 +4,7 @@ from sqlalchemy import inspect
 from sqlalchemy import create_engine
 from sqlalchemy.orm import scoped_session, sessionmaker
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy import Column, Integer, String, and_
+from sqlalchemy import Column, Integer, String, and_, UniqueConstraint
 from sqlalchemy import exc
 
 import requests
@@ -33,6 +33,7 @@ def is_customer_exists(custid):
     if resp.status_code == 200:
         return True
 
+
 # Models
 class Orgs(Base):
     __tablename__ = "orgs"
@@ -44,11 +45,12 @@ class Orgs(Base):
         -2: {'id': 'disabled', 'desc': 'Disabled'}
     }
     id = Column(Integer, primary_key=True)
-    name = Column(String(100), unique=True, nullable=False)
-    custid = Column(String(20), nullable=False)
+    custid = Column(Integer, nullable=False)
+    name = Column(String(100), nullable=False)
     # status: status of customer
     # 0 - free tier, 1 - active, -1 - inactive, -2 - disabled
     status = Column(Integer, default=0)
+    __table_args__ = (UniqueConstraint('custid', 'name', name='_custid_name_uc'),)
 
     def __init__(self, custid=None, name=None, orgid=None, status=None):
         self.name = name
@@ -111,11 +113,7 @@ class Orgs(Base):
         return list(map(self._fix_output, obj))
 
 
-class OrgManager(Resource):
-    parser = reqparse.RequestParser()
-    #parser.add_argument("apps", choices=("wordpress",), required=True, help="Unknown App - {error_msg}")
-    parser.add_argument("status", help="Status of the org")
-
+class OrgBase(Resource):
     def get(self, custid=None, name=None, orgid=None):
         if custid:
             if not is_customer_exists(custid):
@@ -131,7 +129,15 @@ class OrgManager(Resource):
         else:
             abort(410, "Resource with that ID no longer exists")
 
-    def post(self, custid, name):
+
+class OrgManager(OrgBase):
+    parser = reqparse.RequestParser()
+    #parser.add_argument("apps", choices=("wordpress",), required=True, help="Unknown App - {error_msg}")
+    parser.add_argument("status", help="Status of the org")
+
+    def post(self, custid, name=None):
+        if not name:
+            abort(400, "Org name is required")
         if not is_customer_exists(custid):
             print("Customer id {} does not exist".format(custid))
             abort(403, "Something's not right!! You may not have access to the customer")
@@ -149,9 +155,12 @@ class OrgManager(Resource):
             Orgs(custid).delete()
         return jsonify({'status': True})
 
-
+# All get, post and delete allowed
 api.add_resource(OrgManager, "/<int:custid>/orgs", "/<int:custid>/orgs/",
-                 "/<int:custid>/orgs/<string:name>", "/orgs/<int:orgid>")
+                 "/<int:custid>/orgs/<string:name>")
+
+# Only get is allowed
+api.add_resource(OrgBase, "/orgs/<int:orgid>")
 
 
 def init_db():
