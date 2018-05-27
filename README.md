@@ -1,4 +1,7 @@
 # Managed PAAS (MPAAS)
+
+[![Build Status](https://travis-ci.org/hkumarmk/mpaas.svg?branch=master)](https://travis-ci.org/hkumarmk/mpaas)
+
 Idea is to develop a managed platform system that support deploying end user services/application within it.
 
 To start with we would be supporting wordpress - all OS instances, Support services would be managed by the provider
