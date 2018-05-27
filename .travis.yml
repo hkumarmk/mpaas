@@ -3,4 +3,6 @@ language: python
 python:
  - 3.6
 install: pip install -r requirements.txt -r test-requirements.txt
-script: nosetests -v
+script:
+- flake8 --ignore=E501 --import-order-style=google --application-import-names=main customer/*.py org/*.py
+- nosetests -v

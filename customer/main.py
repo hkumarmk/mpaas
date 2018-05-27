@@ -1,12 +1,14 @@
-from flask import Flask, jsonify, abort
-from flask_restful import Resource, Api, reqparse
-from sqlalchemy import inspect
-from sqlalchemy import create_engine
-from sqlalchemy.orm import scoped_session, sessionmaker
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy import Column, Integer, String
-from sqlalchemy import exc as sql_exc
 import os
+
+from flask import abort, Flask, jsonify
+from flask_restful import Api, reqparse, Resource
+from sqlalchemy import Column, Integer, String
+from sqlalchemy import create_engine
+from sqlalchemy import exc as sql_exc
+from sqlalchemy import inspect
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import scoped_session, sessionmaker
+
 
 app = Flask(__name__)
 
@@ -21,6 +23,7 @@ Base = declarative_base()
 Base.query = db_session.query_property()
 
 api = Api(app)
+
 
 # Exceptions
 class CustomerException(BaseException):
@@ -64,9 +67,6 @@ class Customers(Base):
         return True if self.query.filter_by(name=customer).count() > 0 else False
 
     def add(self):
-        num_letters = 3
-        upper_name = "".join(list(filter(str.isalnum, self.name.upper())))
-
         try:
             db_session.add(self)
             db_session.commit()
@@ -75,7 +75,6 @@ class Customers(Base):
         return self.get_cust_id(self.name)
 
     def show(self, name=None, cust_id=None, status=None):
-        fields = ['name', 'status']
         # TODO: we would have to implement using combinatoin of params
         if name:
             return self._object_as_dict(self.query.filter_by(name=name).all())
@@ -130,7 +129,7 @@ class CustomerManager(CustomerBase):
     parser.add_argument("email", required=True, help="Email id is required")
 
     def post(self, name):
-        if name.replace('.','',1).isdigit():
+        if name.replace('.', '', 1).isdigit():
             abort(400, "Name should be a string")
         args = self.parser.parse_args()
         cust = Customers(name, args["email"])
@@ -138,8 +137,7 @@ class CustomerManager(CustomerBase):
             abort(409, "Duplicate customer name")
         # Revert customer addition with exception in case of any of the transactions failed.
         try:
-
-            cust_id = cust.add()
+            cust.add()
         except Exception as err:
             print("Encountered error on creating customer %s" % err)
             abort(500, "Unknown error, please report")
@@ -151,7 +149,7 @@ class CustomerManager(CustomerBase):
             # Cannot delete with customer id
             abort(405)
         try:
-            cust_id = Customers().get_cust_id(name)
+            Customers().get_cust_id(name)
             # TODO: delete operation may be handled as seperate process, delete api operation may
             # just marked that customer as "tobe_removed" status and intimate operations to start
             # customer data removal process.

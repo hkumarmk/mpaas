@@ -1,15 +1,13 @@
-from flask import Flask, jsonify, abort
-from flask_restful import Resource, Api, reqparse
-from sqlalchemy import inspect
-from sqlalchemy import create_engine
-from sqlalchemy.orm import scoped_session, sessionmaker
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy import Column, Integer, String, and_, UniqueConstraint
-from sqlalchemy import exc
-
-import requests
-
 import os
+
+from flask import abort, Flask, jsonify
+from flask_restful import Api, reqparse, Resource
+import requests
+from sqlalchemy import and_, Column, create_engine, inspect, Integer, String, UniqueConstraint
+from sqlalchemy import exc
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import scoped_session, sessionmaker
+
 
 app = Flask(__name__)
 
@@ -71,7 +69,6 @@ class Orgs(Base):
         return True
 
     def show(self):
-        fields = ['name', 'custid', 'status']
         # TODO: we would have to implement using combinatoin of params
         if self.name:
             return self._object_as_dict(self.query.filter(and_(Orgs.name == self.name, Orgs.custid == self.custid)).all())
@@ -132,7 +129,6 @@ class OrgBase(Resource):
 
 class OrgManager(OrgBase):
     parser = reqparse.RequestParser()
-    #parser.add_argument("apps", choices=("wordpress",), required=True, help="Unknown App - {error_msg}")
     parser.add_argument("status", help="Status of the org")
 
     def post(self, custid, name=None):
@@ -154,6 +150,7 @@ class OrgManager(OrgBase):
         else:
             Orgs(custid).delete()
         return jsonify({'status': True})
+
 
 # All get, post and delete allowed
 api.add_resource(OrgManager, "/<int:custid>/orgs", "/<int:custid>/orgs/",
