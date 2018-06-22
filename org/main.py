@@ -85,6 +85,8 @@ class Orgs(Base):
                 cols_deleted = self.query.filter(and_(Orgs.custid == self.custid, Orgs.name == self.name)).delete()
             elif self.status:
                 cols_deleted = self.query.filter(and_(Orgs.custid == self.custid, Orgs.status == self.status)).delete()
+            elif self.orgid:
+                cols_deleted = self.query.filter(Orgs.id == self.orgid).delete()
             else:
                 cols_deleted = self.query.filter(Orgs.custid == self.custid).delete()
 
@@ -124,7 +126,20 @@ class OrgBase(Resource):
         if org or (not name and not orgid):
             return jsonify(Org=org)
         else:
-            abort(410, "Resource with that ID no longer exists")
+            abort(404, "Resource with that ID no longer exists")
+
+    def delete(self, custid=None, name=None, orgid=None):
+        if orgid:
+            Orgs(orgid=orgid).delete()
+        elif not is_customer_exists(custid):
+            print("Customer id {} does not exist".format(custid))
+            abort(403, "Something's not right!! You may not have access to the customer")
+
+        if name:
+            Orgs(custid, name).delete()
+        else:
+            Orgs(custid).delete()
+        return jsonify({'status': True})
 
 
 class OrgManager(OrgBase):
@@ -136,28 +151,17 @@ class OrgManager(OrgBase):
             abort(400, "Org name is required")
         if not is_customer_exists(custid):
             print("Customer id {} does not exist".format(custid))
-            abort(403, "Something's not right!! You may not have access to the customer")
+            abort(403, "Something's not right!! You may not have access to provided customer")
         args = self.parser.parse_args()
         Orgs(custid, name, args["status"]).add()
         return self.get(custid, name)
 
-    def delete(self, custid, name=None):
-        if not is_customer_exists(custid):
-            print("Customer id {} does not exist".format(custid))
-            abort(403, "Something's not right!! You may not have access to the customer")
-        if name:
-            Orgs(custid, name).delete()
-        else:
-            Orgs(custid).delete()
-        return jsonify({'status': True})
-
 
 # All get, post and delete allowed
-api.add_resource(OrgManager, "/<int:custid>/orgs", "/<int:custid>/orgs/",
-                 "/<int:custid>/orgs/<string:name>")
+api.add_resource(OrgManager, "/<int:custid>/orgs/<string:name>")
 
 # Only get is allowed
-api.add_resource(OrgBase, "/orgs/<int:orgid>")
+api.add_resource(OrgBase, "/orgs/<int:orgid>", "/<int:custid>/orgs", "/<int:custid>/orgs/")
 
 
 def init_db():
