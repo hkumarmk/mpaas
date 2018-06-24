@@ -75,7 +75,7 @@ class Orgs(Base):
         elif self.orgid:
             return self._object_as_dict(self.query.filter(Orgs.id == self.orgid).all())
         elif self.status:
-            return self._object_as_dict(self.query.filter(and_(Orgs.name == self.status, Orgs.custid == self.custid)).all())
+            return self._object_as_dict(self.query.filter(and_(Orgs.status == self.status, Orgs.custid == self.custid)).all())
         else:
             return self._object_as_dict(self.query.filter(Orgs.custid == self.custid).all())
 
