@@ -45,7 +45,7 @@ class SpaceTestCase(unittest.TestCase):
         self.assertEquals(main.is_org_exists(100), None)
 
     @mock.patch('space.main.is_org_exists', return_value=True)
-    def test_GET_all_orgs(self, org_mock):
+    def test_GET_all_spaces(self, org_mock):
         """GET all spaces respond with json object with all spaces of specific org"""
         self.populate_data('space1', 1)
         self.populate_data('space2', 1)
@@ -101,7 +101,7 @@ class SpaceTestCase(unittest.TestCase):
 
     @mock.patch('space.main.is_org_exists', return_value=False)
     def test_POST_space_with_nonexistant_org(self, org_mock):
-        """POST to org with nonexistant org fail with 403"""
+        """POST to space with nonexistant org fail with 403"""
         resp = self.app.post('/101/spaces/foo')
         self.assertIn(b"Something's not right!! You may not have access to provided org", resp.data)
         self.assertEquals(resp.status_code, 403)
@@ -140,7 +140,7 @@ class SpaceTestCase(unittest.TestCase):
 
     @mock.patch('space.main.is_org_exists', return_value=True)
     def test_DELETE_a_space_of_an_org(self, org_mock):
-        """DELETE specific org of a org"""
+        """DELETE specific space of an org"""
         self.populate_data('space1', 1)
         self.populate_data('space2', 1)
         self.app.delete('/1/spaces/space1')
