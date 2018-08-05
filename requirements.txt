@@ -3,3 +3,4 @@ flask-sqlalchemy
 future
 sqlalchemy
 requests
+kubernetes
