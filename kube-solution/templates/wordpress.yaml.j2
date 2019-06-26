@@ -10,17 +10,34 @@ metadata:
 spec:
   ports:
     - port: 80
-      targetPort: 80
   selector:
     app: {{org}}-wordpress
     tier: frontend
     org: {{org}}
-  type: NodePort
+
+---
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: {{org}}-ingress
+spec:
+  tls:
+  - hosts:
+    - {{org}}.wpaas.com
+  rules:
+  - host: {{org}}.wpaas.com
+    http:
+      paths:
+      - path: /
+        backend:
+          serviceName: {{org}}-wp
+          servicePort: 80
+
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: {{org}}-wp-lv-claim
+  name: {{org}}-wp-pvc
   namespace: {{org}}
   labels:
     app: {{org}}-wordpress
@@ -30,8 +47,8 @@ spec:
     - ReadWriteOnce
   resources:
     requests:
-      storage: 20Gi
-  storageClassName: hostpath
+      storage: 5Gi
+  storageClassName: gluster-heketi
 ---
 apiVersion: extensions/v1beta1
 kind: Deployment
@@ -86,4 +103,4 @@ spec:
       volumes:
         - name: {{org}}-wordpress-local-storage
           persistentVolumeClaim:
-            claimName: {{org}}-wp-lv-claim
+            claimName: {{org}}-wp-pvc
