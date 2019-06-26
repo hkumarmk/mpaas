@@ -1,0 +1,26 @@
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  labels:
+    org: {{org}}
+  name: {{org}}-secret
+  namespace: {{org}}
+type: Opaque
+data:
+  ROOT_PASSWORD: "{{ root_pass }}"
+  DATABASE: "{{ wp_dbname }}"
+  USER: "{{ wp_dbuser }}"
+  PASSWORD: "{{ wp_dbpass }}"
+---
+apiVersion: mysql.presslabs.org/v1alpha1
+kind: MysqlCluster
+metadata:
+  labels:
+    org: {{org}}
+    app: {{org}}-mysql
+  name: {{org}}
+  namespace: {{org}}
+spec:
+  replicas: 1
+  secretName: {{org}}-secret

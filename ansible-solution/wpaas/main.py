@@ -2,7 +2,6 @@ import os
 
 from flask import abort, Flask, jsonify
 from flask_restful import Api, reqparse, Resource
-from kubernetes import client, config
 import requests
 from sqlalchemy import and_, Column, create_engine, inspect, Integer, String, UniqueConstraint
 from sqlalchemy import exc
